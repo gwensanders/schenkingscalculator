@@ -27,21 +27,7 @@ growth = st.sidebar.slider(
     0.15,
     0.05,
     0.005
-)
 
-shares_total = st.sidebar.number_input(
-    "Totaal aantal aandelen",
-    min_value=1,
-    value=180,
-    step=1
-)
-
-acquisition_value_total = st.sidebar.number_input(
-    "Totale verkrijgingsprijs aandelen",
-    min_value=0.0,
-    value=180.0,
-    step=1.0,
-    format="%.2f"
 )
 
 gift_pct_year_1 = st.sidebar.number_input(
@@ -113,8 +99,6 @@ with st.expander("Uitleg aannames en berekeningen", expanded=True):
 **Uitgangswaardes**
 
 - Startwaarde BV: **{euro_fmt(float(bv_value))}**
-- Totaal aantal aandelen: **{int(shares_total)}**
-- Totale verkrijgingsprijs aandelen: **{euro_fmt(float(acquisition_value_total))}**
 - Box 2 laag tarief: **{box2_low * 100:.1f}%** tot **{euro_fmt(box2_threshold)}**
 - Box 2 hoog tarief: **{box2_high * 100:.1f}%** boven **{euro_fmt(box2_threshold)}**
 - Schenkbelasting laag tarief: **{gift_low * 100:.1f}%** tot **{euro_fmt(gift_threshold)}**
@@ -125,19 +109,19 @@ with st.expander("Uitleg aannames en berekeningen", expanded=True):
 
 1. Eerst berekenen we de **AB-grondslag** van de schenking.  
 2. Daarover berekenen we de **box 2 over schenking**.  
-3. Daarna rekenen we terug welk **bruto dividend voor Jeroen** nodig is zodat na box 2 op dat dividend
+3. Daarna rekenen we terug welk **bruto dividend voor vader** nodig is zodat na box 2 op dat dividend
    netto precies genoeg overblijft om die box 2 over de schenking te betalen.
 
 Dus:
 
-- **bruto dividend Jeroen - box 2 over dividend Jeroen = box 2 over schenking**
+- **bruto dividend vader - box 2 over dividend vader = box 2 over schenking**
 
 Omdat het dividend **voor de schenking** wordt uitgekeerd, wordt het totale dividend in de BV verdeeld volgens de
 aandelenverhouding aan het **begin van het jaar**:
-- Jeroen ontvangt: **Jeroen % × totaal dividend**
+- Vader ontvangt: **Vader % × totaal dividend**
 - kind ontvangt: **kind % × totaal dividend**
 
-Daarom is het **totale dividend uit de BV** vaak hoger dan het dividend dat Jeroen persoonlijk ontvangt.
+Daarom is het **totale dividend uit de BV** vaak hoger dan het dividend dat vader persoonlijk ontvangt.
 
 **Berekening AB-grondslag**
 
@@ -175,21 +159,21 @@ def simulate():
         pct_company = min(max(pct_input / 100.0, 0.0), father_pct_start)
 
         # Omdat dividend vóór schenking plaatsvindt, moet het benodigde dividend
-        # worden bepaald met het belang van Jeroen aan het begin van het jaar.
+        # worden bepaald met het belang van vader aan het begin van het jaar.
         # Eerst benaderen we de latere schenking op basis van BV-waarde ná dividend.
         # Daarvoor lossen we iteratief op:
         # 1) bereken gift value op basis van bv na dividend
         # 2) bereken box2 over schenking
-        # 3) bepaal netto dividend dat Jeroen nodig heeft
+        # 3) bepaal netto dividend dat vader nodig heeft
         # 4) vertaal dat naar totaal dividend uit de BV, rekening houdend met zijn % belang
         total_dividend = 0.0
-        dividend_jeroen = 0.0
+        dividend_vader = 0.0
         dividend_kind = 0.0
         ab_groundslag = 0.0
         gift_val = 0.0
         acquisition_part = 0.0
         box2_due_on_gift = 0.0
-        box2_on_dividend_jeroen = 0.0
+        box2_on_dividend_vader = 0.0
         box2_on_dividend_kind = 0.0
 
         if father_pct_start > 0 and pct_company > 0:
@@ -206,25 +190,25 @@ def simulate():
                 ab_groundslag = max(0.0, gift_val - acquisition_part)
                 box2_due_on_gift = box2_tax(ab_groundslag)
 
-                # Jeroen moet netto dit bedrag overhouden uit zijn eigen dividend
-                dividend_jeroen_new = gross_dividend_needed_for_net(box2_due_on_gift)
+                # vader moet netto dit bedrag overhouden uit zijn eigen dividend
+                dividend_vader_new = gross_dividend_needed_for_net(box2_due_on_gift)
 
-                # Totaal dividend uit de BV moet hoger zijn als Jeroen minder dan 100% bezit
+                # Totaal dividend uit de BV moet hoger zijn als vader minder dan 100% bezit
                 total_dividend_new = (
-                    dividend_jeroen_new / father_pct_start
+                    dividend_vader_new / father_pct_start
                     if father_pct_start > 0 else 0.0
                 )
 
                 if abs(total_dividend_new - total_dividend) < 0.01:
                     total_dividend = total_dividend_new
-                    dividend_jeroen = dividend_jeroen_new
+                    dividend_vader = dividend_vader_new
                     break
 
                 total_dividend = total_dividend_new
-                dividend_jeroen = dividend_jeroen_new
+                dividend_vader = dividend_vader_new
 
             dividend_kind = total_dividend * child_pct_start
-            box2_on_dividend_jeroen = box2_tax(dividend_jeroen)
+            box2_on_dividend_vader = box2_tax(dividend_vader)
             box2_on_dividend_kind = box2_tax(dividend_kind)
         else:
             bv_after_dividend = bv_begin
@@ -233,9 +217,9 @@ def simulate():
             ab_groundslag = 0.0
             box2_due_on_gift = 0.0
             total_dividend = 0.0
-            dividend_jeroen = 0.0
+            dividend_vader = 0.0
             dividend_kind = 0.0
-            box2_on_dividend_jeroen = 0.0
+            box2_on_dividend_vader = 0.0
             box2_on_dividend_kind = 0.0
 
         bv_after_dividend = max(0.0, bv_begin - total_dividend)
@@ -253,15 +237,15 @@ def simulate():
             "jaar": y,
             "BV waarde begin jaar": bv_begin,
             "percentage schenking": pct_company,
-            "Jeroen % begin jaar": father_pct_start,
+            "vader % begin jaar": father_pct_start,
             "kind % begin jaar": child_pct_start,
             "totaal dividend BV": total_dividend,
-            "dividend Jeroen": dividend_jeroen,
+            "dividend vader": dividend_vader,
             "dividend kind": dividend_kind,
             "AB grondslag": ab_groundslag,
             "waarde schenking na dividend": gift_val,
             "box 2 over schenking": box2_due_on_gift,
-            "box 2 over dividend Jeroen": box2_on_dividend_jeroen,
+            "box 2 over dividend vader": box2_on_dividend_vader,
             "box 2 over dividend kind": box2_on_dividend_kind,
             "schenkbelasting": gift_t,
             "belang kind einde jaar": child_pct,
@@ -282,12 +266,12 @@ display_df = df.copy()
 currency_cols = [
     "BV waarde begin jaar",
     "totaal dividend BV",
-    "dividend Jeroen",
+    "dividend vader",
     "dividend kind",
     "AB grondslag",
     "waarde schenking na dividend",
     "box 2 over schenking",
-    "box 2 over dividend Jeroen",
+    "box 2 over dividend vader",
     "box 2 over dividend kind",
     "schenkbelasting",
     "BV waarde einde jaar"
@@ -298,7 +282,7 @@ for col in currency_cols:
 
 pct_cols = [
     "percentage schenking",
-    "Jeroen % begin jaar",
+    "vader % begin jaar",
     "kind % begin jaar",
     "belang kind einde jaar"
 ]
@@ -317,7 +301,7 @@ st.pyplot(fig)
 
 fig2 = plt.figure(figsize=(8, 4.5))
 plt.plot(df["jaar"], df["box 2 over schenking"], marker="o", label="Box 2 over schenking")
-plt.plot(df["jaar"], df["box 2 over dividend Jeroen"], marker="o", label="Box 2 over dividend Jeroen")
+plt.plot(df["jaar"], df["box 2 over dividend vader"], marker="o", label="Box 2 over dividend vader")
 plt.plot(df["jaar"], df["box 2 over dividend kind"], marker="o", label="Box 2 over dividend kind")
 plt.plot(df["jaar"], df["schenkbelasting"], marker="o", label="Schenkbelasting")
 plt.legend()
