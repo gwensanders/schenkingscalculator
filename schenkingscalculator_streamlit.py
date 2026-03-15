@@ -1,4 +1,3 @@
-
 # Streamlit Schenkingscalculator
 # Start met: python -m streamlit run schenkingscalculator_streamlit.py
 
@@ -27,7 +26,6 @@ growth = st.sidebar.slider(
     0.15,
     0.05,
     0.005
-
 )
 
 gift_pct_year_1 = st.sidebar.number_input(
@@ -64,7 +62,7 @@ def euro_fmt(x: float) -> str:
 
 
 def pct_fmt(x: float) -> str:
-    return f"{x*100:.2f}%".replace(".", ",")
+    return f"{x * 100:.2f}%".replace(".", ",")
 
 
 def gift_tax(x: float) -> float:
@@ -104,12 +102,14 @@ with st.expander("Uitleg aannames en berekeningen", expanded=True):
 - Schenkbelasting laag tarief: **{gift_low * 100:.1f}%** tot **{euro_fmt(gift_threshold)}**
 - Schenkbelasting hoog tarief: **{gift_high * 100:.1f}%** boven **{euro_fmt(gift_threshold)}**
 - Uitgangspunt: **dividend wordt eerst uitgekeerd, daarna pas geschonken**
+- Vereenvoudiging: **AB-grondslag = waarde schenking na dividend**
 
 **Berekening dividendbedrag**
 
-1. Eerst berekenen we de **AB-grondslag** van de schenking.  
-2. Daarover berekenen we de **box 2 over schenking**.  
-3. Daarna rekenen we terug welk **bruto dividend voor vader** nodig is zodat na box 2 op dat dividend
+1. Eerst bepalen we de waarde van de schenking **na dividend**.
+2. Die waarde gebruiken we als **AB-grondslag**.
+3. Daarover berekenen we de **box 2 over schenking**.
+4. Daarna rekenen we terug welk **bruto dividend voor vader** nodig is zodat na box 2 op dat dividend
    netto precies genoeg overblijft om die box 2 over de schenking te betalen.
 
 Dus:
@@ -118,16 +118,16 @@ Dus:
 
 Omdat het dividend **voor de schenking** wordt uitgekeerd, wordt het totale dividend in de BV verdeeld volgens de
 aandelenverhouding aan het **begin van het jaar**:
-- Vader ontvangt: **Vader % × totaal dividend**
+- Vader ontvangt: **vader % × totaal dividend**
 - kind ontvangt: **kind % × totaal dividend**
 
 Daarom is het **totale dividend uit de BV** vaak hoger dan het dividend dat vader persoonlijk ontvangt.
 
 **Berekening AB-grondslag**
 
-De AB-grondslag wordt berekend als:
+De AB-grondslag wordt hier berekend als:
 
-**waarde geschonken aandelen na dividend - verkrijgingsprijs van datzelfde deel**
+**waarde geschonken aandelen na dividend**
 
 Dus:
 - eerst gaat het dividend uit de BV
@@ -146,8 +146,6 @@ def simulate():
     bv = float(bv_value)
     father_pct = 1.0
     child_pct = 0.0
-    father_acquisition_remaining = float(acquisition_value_total)
-
     rows = []
 
     for y in range(1, years + 1):
@@ -158,42 +156,30 @@ def simulate():
         pct_input = float(gift_pct_year_1) if y == 1 else float(gift_pct_from_year_2)
         pct_company = min(max(pct_input / 100.0, 0.0), father_pct_start)
 
-        # Omdat dividend vóór schenking plaatsvindt, moet het benodigde dividend
-        # worden bepaald met het belang van vader aan het begin van het jaar.
-        # Eerst benaderen we de latere schenking op basis van BV-waarde ná dividend.
-        # Daarvoor lossen we iteratief op:
-        # 1) bereken gift value op basis van bv na dividend
-        # 2) bereken box2 over schenking
-        # 3) bepaal netto dividend dat vader nodig heeft
-        # 4) vertaal dat naar totaal dividend uit de BV, rekening houdend met zijn % belang
         total_dividend = 0.0
         dividend_vader = 0.0
         dividend_kind = 0.0
         ab_groundslag = 0.0
         gift_val = 0.0
-        acquisition_part = 0.0
         box2_due_on_gift = 0.0
         box2_on_dividend_vader = 0.0
         box2_on_dividend_kind = 0.0
 
         if father_pct_start > 0 and pct_company > 0:
-            for _ in range(40):
+            for _ in range(50):
                 bv_after_dividend = max(0.0, bv_begin - total_dividend)
 
+                # schenking wordt gewaardeerd ná dividend
                 gift_val = pct_company * bv_after_dividend
 
-                acquisition_part = (
-                    (pct_company / father_pct_start) * father_acquisition_remaining
-                    if father_pct_start > 0 else 0.0
-                )
-
-                ab_groundslag = max(0.0, gift_val - acquisition_part)
+                # vereenvoudigd model: AB-grondslag = waarde schenking
+                ab_groundslag = gift_val
                 box2_due_on_gift = box2_tax(ab_groundslag)
 
                 # vader moet netto dit bedrag overhouden uit zijn eigen dividend
                 dividend_vader_new = gross_dividend_needed_for_net(box2_due_on_gift)
 
-                # Totaal dividend uit de BV moet hoger zijn als vader minder dan 100% bezit
+                # totaal dividend in BV volgt uit vader's belang aan begin van jaar
                 total_dividend_new = (
                     dividend_vader_new / father_pct_start
                     if father_pct_start > 0 else 0.0
@@ -212,24 +198,14 @@ def simulate():
             box2_on_dividend_kind = box2_tax(dividend_kind)
         else:
             bv_after_dividend = bv_begin
-            gift_val = 0.0
-            acquisition_part = 0.0
-            ab_groundslag = 0.0
-            box2_due_on_gift = 0.0
-            total_dividend = 0.0
-            dividend_vader = 0.0
-            dividend_kind = 0.0
-            box2_on_dividend_vader = 0.0
-            box2_on_dividend_kind = 0.0
 
         bv_after_dividend = max(0.0, bv_begin - total_dividend)
 
-        # Schenkbelasting wordt berekend over waarde schenking na dividend
+        # schenkbelasting over waarde schenking na dividend
         gift_t = gift_tax(gift_val)
 
         father_pct = max(0.0, father_pct_start - pct_company)
         child_pct = min(1.0, child_pct_start + pct_company)
-        father_acquisition_remaining = max(0.0, father_acquisition_remaining - acquisition_part)
 
         bv_end = bv_after_dividend * (1.0 + growth)
 
