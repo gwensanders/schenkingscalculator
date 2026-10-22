@@ -73,23 +73,25 @@ def box2_tax(x: float) -> float:
     return min(x, box2_threshold) * box2_low + max(0.0, x - box2_threshold) * box2_high
 
 
-def gross_dividend_needed_for_net(net_needed: float) -> float:
+def gross_dividend_needed_for_gift(ab_gain: float) -> float:
     """
-    Bruto dividend op aandeelhoudersniveau zó dat netto precies 'net_needed' overblijft.
-    Dus:
-        bruto dividend - box2(bruto dividend) = net_needed
+    Bruto dividend vader zó dat het precies de box 2 betaalt over dividend + schenking samen.
+    Dividend en vervreemdingsvoordeel vallen in hetzelfde jaar in één box 2-inkomen,
+    dus de lage schijf wordt maar één keer benut:
+        bruto dividend = box2(bruto dividend + AB-grondslag)
     """
-    net_needed = max(0.0, net_needed)
+    ab_gain = max(0.0, ab_gain)
 
-    if net_needed == 0:
+    if ab_gain == 0:
         return 0.0
 
-    net_low_cap = box2_threshold * (1.0 - box2_low)
+    # geheel in de lage schijf
+    dividend = ab_gain * box2_low / (1.0 - box2_low)
+    if dividend + ab_gain <= box2_threshold:
+        return dividend
 
-    if net_needed <= net_low_cap:
-        return net_needed / (1.0 - box2_low)
-
-    return box2_threshold + ((net_needed - net_low_cap) / (1.0 - box2_high))
+    # deels in de hoge schijf
+    return (box2_threshold * (box2_low - box2_high) + box2_high * ab_gain) / (1.0 - box2_high)
 
 
 with st.expander("Uitleg aannames en berekeningen", expanded=True):
@@ -108,13 +110,15 @@ with st.expander("Uitleg aannames en berekeningen", expanded=True):
 
 1. Eerst bepalen we de waarde van de schenking **na dividend**.
 2. Die waarde gebruiken we als **AB-grondslag**.
-3. Daarover berekenen we de **box 2 over schenking**.
-4. Daarna rekenen we terug welk **bruto dividend voor vader** nodig is zodat na box 2 op dat dividend
-   netto precies genoeg overblijft om die box 2 over de schenking te betalen.
+3. Dividend en schenking vallen in hetzelfde jaar bij vader in **één box 2-inkomen**,
+   dus de lage schijf wordt maar één keer benut.
+4. Daarna rekenen we terug welk **bruto dividend voor vader** nodig is om de box 2 over
+   dividend en schenking samen precies te betalen.
 
 Dus:
 
-- **bruto dividend vader - box 2 over dividend vader = box 2 over schenking**
+- **bruto dividend vader = box 2 over (dividend vader + AB-grondslag)**
+- In de tabel vult het dividend de schijven eerst; de **box 2 over schenking** is wat de schenking daarbovenop kost.
 
 Omdat het dividend **voor de schenking** wordt uitgekeerd, wordt het totale dividend in de BV verdeeld volgens de
 aandelenverhouding aan het **begin van het jaar**:
@@ -174,10 +178,9 @@ def simulate():
 
                 # vereenvoudigd model: AB-grondslag = waarde schenking
                 ab_groundslag = gift_val
-                box2_due_on_gift = box2_tax(ab_groundslag)
 
-                # vader moet netto dit bedrag overhouden uit zijn eigen dividend
-                dividend_vader_new = gross_dividend_needed_for_net(box2_due_on_gift)
+                # dividend vader betaalt de box 2 over dividend + schenking samen
+                dividend_vader_new = gross_dividend_needed_for_gift(ab_groundslag)
 
                 # totaal dividend in BV volgt uit vader's belang aan begin van jaar
                 total_dividend_new = (
@@ -194,7 +197,10 @@ def simulate():
                 dividend_vader = dividend_vader_new
 
             dividend_kind = total_dividend * child_pct_start
+            # één box 2-inkomen voor vader; dividend vult de schijven eerst, schenking erbovenop
+            box2_total_vader = box2_tax(dividend_vader + ab_groundslag)
             box2_on_dividend_vader = box2_tax(dividend_vader)
+            box2_due_on_gift = box2_total_vader - box2_on_dividend_vader
             box2_on_dividend_kind = box2_tax(dividend_kind)
         else:
             bv_after_dividend = bv_begin
