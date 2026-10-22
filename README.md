@@ -13,11 +13,11 @@ Uitgangspunt: dividend wordt eerst uitgekeerd, daarna pas geschonken
 Berekening dividendbedrag
 
 Eerst berekenen we de AB-grondslag van de schenking.
-Daarover berekenen we de box 2 over schenking.
-Daarna rekenen we terug welk bruto dividend voor Jeroen nodig is zodat na box 2 op dat dividend netto precies genoeg overblijft om die box 2 over de schenking te betalen.
+Dividend en schenking vallen in hetzelfde jaar bij Jeroen in één box 2-inkomen, dus de lage schijf wordt maar één keer benut.
+Daarna rekenen we terug welk bruto dividend voor Jeroen nodig is om de box 2 over dividend en schenking samen precies te betalen.
 Dus:
 
-bruto dividend Jeroen - box 2 over dividend Jeroen = box 2 over schenking
+bruto dividend Jeroen = box 2 over (dividend Jeroen + AB-grondslag)
 Omdat het dividend voor de schenking wordt uitgekeerd, wordt het totale dividend in de BV verdeeld volgens de aandelenverhouding aan het begin van het jaar:
 
 Jeroen ontvangt: Jeroen % × totaal dividend
